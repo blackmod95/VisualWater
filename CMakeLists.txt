@@ -14,6 +14,12 @@ include_directories(glm)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -Wall -Wextra -std=c++11")
 
-set(SOURCE_FILES main.cpp)
+set(SOURCE_FILES
+        main.cpp
+        utils/camera.h
+        utils/camera.cpp
+        utils/utils.h
+        utils/utils.cpp
+        )
 add_executable(VisualWater ${SOURCE_FILES})
 target_link_libraries(VisualWater glfw ${GLFW_LIBRARIES} ${OPENGL_LIBRARY} glxw)

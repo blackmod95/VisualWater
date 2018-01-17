@@ -1,87 +1,17 @@
 #include <iostream>
+#include <vector>
+#include <chrono>
+
 #include <GLXW/glxw.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
-#include <vector>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/transform.hpp>
+#include "utils/utils.h"
+#include "utils/camera.h"
 
-
-static const GLfloat globVertexBufferData[] = {
-        0.0f, 0.0f,  0.0f
-};
-
-bool checkShaderCompileStatus(GLuint obj) {
-    GLint status;
-    glGetShaderiv(obj, GL_COMPILE_STATUS, &status);
-    if(status == GL_FALSE) {
-        GLint length;
-        glGetShaderiv(obj, GL_INFO_LOG_LENGTH, &length);
-        std::vector<char> log((unsigned long)length);
-        glGetShaderInfoLog(obj, length, &length, &log[0]);
-        std::cerr << &log[0];
-        return true;
-    }
-    return false;
-}
-
-bool checkProgramLinkStatus(GLuint obj) {
-    GLint status;
-    glGetProgramiv(obj, GL_LINK_STATUS, &status);
-    if(status == GL_FALSE) {
-        GLint length;
-        glGetProgramiv(obj, GL_INFO_LOG_LENGTH, &length);
-        std::vector<char> log((unsigned long)length);
-        glGetProgramInfoLog(obj, length, &length, &log[0]);
-        std::cerr << &log[0];
-        return true;
-    }
-    return false;
-}
-
-GLuint prepareProgram(bool *errorFlagPtr) {
-    *errorFlagPtr = false;
-
-    std::string vertexShaderSource = ""
-            "#version 330 core\n"
-            "layout(location = 0) in vec3 vertexPos;\n"
-            "void main(){\n"
-            "  gl_Position.xyz = vertexPos;\n"
-            "  gl_Position.w = 1.0;\n"
-            "}";
-
-    GLuint vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
-    const GLchar * const vertexShaderSourcePtr = vertexShaderSource.c_str();
-    glShaderSource(vertexShaderId, 1, &vertexShaderSourcePtr, nullptr);
-    glCompileShader(vertexShaderId);
-
-    *errorFlagPtr = checkShaderCompileStatus(vertexShaderId);
-    if(*errorFlagPtr) return 0;
-
-    std::string fragmentShaderSource = ""
-            "#version 330 core\n"
-            "out vec3 color;\n"
-            "void main() { color = vec3(0,0.5,0.5); }\n";
-
-    GLuint fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
-    const GLchar * const fragmentShaderSourcePtr = fragmentShaderSource.c_str();
-    glShaderSource(fragmentShaderId, 1, &fragmentShaderSourcePtr, nullptr);
-    glCompileShader(fragmentShaderId);
-
-    *errorFlagPtr = checkShaderCompileStatus(fragmentShaderId);
-    if(*errorFlagPtr) return 0;
-
-    GLuint programId = glCreateProgram();
-    glAttachShader(programId, vertexShaderId);
-    glAttachShader(programId, fragmentShaderId);
-    glLinkProgram(programId);
-
-    *errorFlagPtr = checkProgramLinkStatus(programId);
-    if(*errorFlagPtr) return 0;
-
-    glDeleteShader(vertexShaderId);
-    glDeleteShader(fragmentShaderId);
-
-    return programId;
-}
+static const int sideSize = 100;
+static GLfloat globVertexBufferData[3 * sideSize * sideSize];
 
 void windowSizeCallback(GLFWwindow *, int width, int height) {
     glViewport(0, 0, width, height);
@@ -100,7 +30,10 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
-    GLFWwindow* window = glfwCreateWindow(500, 500, "Visual water",
+    int width = 500;
+    int height = 500;
+
+    GLFWwindow* window = glfwCreateWindow(width, height, "Visual water",
                                           nullptr, nullptr);
     if(window == nullptr) {
         std::cerr << "Failed to open GLFW window" << std::endl;
@@ -129,37 +62,132 @@ int main() {
 
     glClearColor(0, 0, 0, 1);
 
-    bool errorFlag;
-    GLuint programId = prepareProgram(&errorFlag);
+    bool errorFlag = false;
+    std::vector<GLuint> shaders;
+
+    GLuint vertexShaderId = loadShader("shaders/vertexShader.glsl", GL_VERTEX_SHADER, &errorFlag);
     if(errorFlag) {
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        std::cerr << "Failed to load vertex shader (invalid working directory?)" << std::endl;
         return -1;
     }
 
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(globVertexBufferData), globVertexBufferData, GL_STATIC_DRAW);
+    shaders.push_back(vertexShaderId);
+
+    GLuint fragmentShaderId = loadShader("shaders/fragmentShader.glsl", GL_FRAGMENT_SHADER, &errorFlag);
+    if(errorFlag) {
+        std::cerr << "Failed to load fragment shader (invalid working directory?)" << std::endl;
+        return -1;
+    }
+    shaders.push_back(fragmentShaderId);
+
+    GLuint programId = prepareProgram(shaders, &errorFlag);
+    if(errorFlag) {
+        std::cerr << "Failed to prepare program" << std::endl;
+        return -1;
+    }
+
+    // инициализация массива с вершинами будущей поверхности
+    for (int i = 0; i < sideSize; i++)
+    {
+        for (int j = 0; j < sideSize; j++)
+        {
+            globVertexBufferData[3 * (i * sideSize + j) + 0] = -1.0f + 2.0f * static_cast<float>(i) / (sideSize - 1);
+            globVertexBufferData[3 * (i * sideSize + j) + 1] = -1.0f + 2.0f * static_cast<float>(j) / (sideSize - 1);
+            globVertexBufferData[3 * (i * sideSize + j) + 2] = 0;
+        }
+    }
+
+    for (int i = 0; i < sideSize*sideSize; i++)
+    {
+        std::cout << globVertexBufferData[3*i+0] << " " << globVertexBufferData[3*i+1] << " " << globVertexBufferData[3*i+2] << std::endl;
+    }
+
+    GLuint vboVertex;
+    glGenBuffers(1, &vboVertex);
+    glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(globVertexBufferData), globVertexBufferData, GL_STREAM_DRAW);
 
     GLuint vao;
     glGenVertexArrays(1, &vao);
 
     glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
     glBindBuffer(GL_ARRAY_BUFFER, 0); // unbind VBO
     glBindVertexArray(0); // unbind VAO
 
-    glPointSize(5);
+    glm::mat4 projection = glm::perspective(120.0f, (float)width / (float)height, 0.3f, 100.0f);
+
+    GLint matrixId = glGetUniformLocation(programId, "MVP");
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    Camera camera(window, glm::vec3(-0.01f, -0.01f , 1.0f), 0.0f, 0.0, 2.0f);
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+    auto prevTime = startTime;
+
+    glPointSize(2);
+
+    auto prevTimeForUpdateArrays = startTime;
+
     while(glfwWindowShouldClose(window) == GL_FALSE) {
+        // выход из программы
+        if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) break;
+
+        // отображение ребер полигонов
+        if(glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+
+        // окрашенное изображение
+        if(glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float startDeltaTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count();
+        float prevDeltaTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - prevTime).count();
+        float prevDeltaTimeForUpdateMs = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - prevTimeForUpdateArrays).count();
+        prevTime = currentTime;
+
+        if (prevDeltaTimeForUpdateMs > 1000.0f/24)
+        {
+            prevTimeForUpdateArrays = currentTime;
+            for (int i = 0; i < sideSize; i++)
+            {
+                for (int j = 0; j < sideSize; j++)
+                {
+                    GLfloat x = globVertexBufferData[3 * (i * sideSize + j) + 0];
+                    GLfloat y = globVertexBufferData[3 * (i * sideSize + j) + 1];
+                    globVertexBufferData[3 * (i * sideSize + j) + 2] = 0.03f * std::cos(10.0f*x+10.1f*y+5.0f*(startDeltaTimeMs/1000));
+                }
+            }
+            glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(globVertexBufferData), globVertexBufferData);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+
+        glm::mat4 view;
+        camera.getViewMatrix(prevDeltaTimeMs, &view);
+
+        glm::mat4 model = glm::rotate(0.0f, 1.0f, 0.0f, 0.0f);
+
+        glm::mat4 mvp = projection * view * model; // matrix multiplication is the other way around
+        glUniformMatrix4fv(matrixId, 1, GL_FALSE, &mvp[0][0]);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Растягивание изображения в зависимости от размера окна
+        glfwGetWindowSize(window, &width, &height);
+        glViewport(0, 0, 2*width, 2*height);
 
         glUseProgram(programId); // Использование шейдеров
 
         glBindVertexArray(vao);
         glEnableVertexAttribArray(0);
-        glDrawArrays(GL_POINTS, 0, 1);
+        glDrawArrays(GL_POINTS, 0, sideSize * sideSize);
+
         glDisableVertexAttribArray(0);
 
         glfwSwapBuffers(window);
@@ -167,8 +195,11 @@ int main() {
     }
 
     glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vbo);
+    glDeleteBuffers(1, &vboVertex);
     glDeleteProgram(programId);
+
+    glDeleteShader(vertexShaderId);
+    glDeleteShader(fragmentShaderId);
 
     glfwDestroyWindow(window);
     glfwTerminate();
