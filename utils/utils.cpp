@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <GLFW/glfw3.h>
 
 bool checkShaderCompileStatus(GLuint obj) {
     GLint status;

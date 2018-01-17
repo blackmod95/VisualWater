@@ -2,13 +2,13 @@
 
 layout(location = 0) in vec3 vertexPos;
 
-out vec3 fragmentColor;
+out float warm;
 
 uniform mat4 MVP;
 
 void main() {
-    fragmentColor = vec3(0.0f, 0.5f, 0.5f);
+    warm = (1 - vertexPos.z) * 0.5;
 
-    vec4 temp = vec4(vertexPos, 1);
+    vec4 temp = vec4(vertexPos.xy, warm, 1);
     gl_Position = MVP * temp;
 }

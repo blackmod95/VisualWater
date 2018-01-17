@@ -11,10 +11,102 @@
 #include "utils/camera.h"
 
 static const int sideSize = 100;
-static GLfloat globVertexBufferData[3 * sideSize * sideSize];
+static const int globVertexBufferDataSize = 2 * 3 * 3 * (sideSize-1) * (sideSize-1);
+static GLfloat globVertexBufferData[globVertexBufferDataSize];
+
+struct Wave
+{
+    GLfloat ampl;
+    GLfloat vec_x;
+    GLfloat vec_y;
+    GLfloat freq;
+    GLfloat phase;
+};
+
+std::vector<Wave> waves;
 
 void windowSizeCallback(GLFWwindow *, int width, int height) {
     glViewport(0, 0, width, height);
+}
+
+void init()
+{
+    // триангуляция водной поверхности
+    for (int i = 0; i < sideSize - 1; i++)
+    {
+        for (int j = 0; j < sideSize - 1; j++)
+        {
+            // текущая вершина
+            GLfloat x00 = -1.0f + 2.0f * static_cast<float>(i) / (sideSize - 1);
+            GLfloat y00 = -1.0f + 2.0f * static_cast<float>(j) / (sideSize - 1);
+            GLfloat x01 = -1.0f + 2.0f * static_cast<float>(i) / (sideSize - 1);
+            GLfloat y01 = -1.0f + 2.0f * static_cast<float>(j+1) / (sideSize - 1);
+            GLfloat x10 = -1.0f + 2.0f * static_cast<float>(i+1) / (sideSize - 1);
+            GLfloat y10 = -1.0f + 2.0f * static_cast<float>(j) / (sideSize - 1);
+            GLfloat x11 = -1.0f + 2.0f * static_cast<float>(i+1) / (sideSize - 1);
+            GLfloat y11 = -1.0f + 2.0f * static_cast<float>(j+1) / (sideSize - 1);
+
+            // на основании 4 вершин строится 2 треугольника. Добавляем их как 6 разных вершин
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 0] = x00;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 1] = y00;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 2] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 3] = x01;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 4] = y01;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 5] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 6] = x11;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 7] = y11;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 8] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 9] = x00;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 10] = y00;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 11] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 12] = x11;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 13] = y11;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 14] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 15] = x10;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 16] = y10;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 17] = 0;
+        }
+    }
+
+    // волны задаются в отдельном векторе
+    Wave wave1, wave2, wave3;
+    wave1.ampl = 0.05f;
+    wave1.vec_x = 10.0f;
+    wave1.vec_y = 10.0f;
+    wave1.freq = 5.0f;
+    wave1.phase = 0.0f;
+    waves.push_back(wave1);
+    wave2.ampl = 0.06f;
+    wave2.vec_x = 12.0f;
+    wave2.vec_y = 12.0f;
+    wave2.freq = 2.0f;
+    wave2.phase = 3.14f/2;
+    waves.push_back(wave2);
+    wave3.ampl = 0.03f;
+    wave3.vec_x = 0.0f;
+    wave3.vec_y = 3.0f;
+    wave3.freq = 2.0f;
+    wave3.phase = 0.75f;
+    waves.push_back(wave3);
+}
+
+void update(GLuint &vboVertex, float &startDeltaTimeMs)
+{
+    for (int i = 0; i < globVertexBufferDataSize / 3; i++)
+    {
+        GLfloat x = globVertexBufferData[3 * i + 0];
+        GLfloat y = globVertexBufferData[3 * i + 1];
+        globVertexBufferData[3 * i + 2] = 0.0f;
+        for (int w = 0; w < waves.size(); w++)
+        {
+            globVertexBufferData[3 * i + 2] +=
+                    waves[w].ampl * std::cos(waves[w].vec_x * x + waves[w].vec_y * y +
+                    waves[w].freq * (startDeltaTimeMs / 1000) + waves[w].phase);
+        }
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(globVertexBufferData), globVertexBufferData);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 int main() {
@@ -86,21 +178,7 @@ int main() {
         return -1;
     }
 
-    // инициализация массива с вершинами будущей поверхности
-    for (int i = 0; i < sideSize; i++)
-    {
-        for (int j = 0; j < sideSize; j++)
-        {
-            globVertexBufferData[3 * (i * sideSize + j) + 0] = -1.0f + 2.0f * static_cast<float>(i) / (sideSize - 1);
-            globVertexBufferData[3 * (i * sideSize + j) + 1] = -1.0f + 2.0f * static_cast<float>(j) / (sideSize - 1);
-            globVertexBufferData[3 * (i * sideSize + j) + 2] = 0;
-        }
-    }
-
-    for (int i = 0; i < sideSize*sideSize; i++)
-    {
-        std::cout << globVertexBufferData[3*i+0] << " " << globVertexBufferData[3*i+1] << " " << globVertexBufferData[3*i+2] << std::endl;
-    }
+    init();
 
     GLuint vboVertex;
     glGenBuffers(1, &vboVertex);
@@ -116,18 +194,16 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, 0); // unbind VBO
     glBindVertexArray(0); // unbind VAO
 
-    glm::mat4 projection = glm::perspective(120.0f, (float)width / (float)height, 0.3f, 100.0f);
+    glm::mat4 projection = glm::perspective(80.0f, (float)width / (float)height, 0.3f, 100.0f);
 
     GLint matrixId = glGetUniformLocation(programId, "MVP");
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    Camera camera(window, glm::vec3(-0.01f, -0.01f , 1.0f), 0.0f, 0.0, 2.0f);
+    Camera camera(window, 0.0f, 0.0, 2.0f);
 
     auto startTime = std::chrono::high_resolution_clock::now();
     auto prevTime = startTime;
-
-    glPointSize(2);
 
     auto prevTimeForUpdateArrays = startTime;
 
@@ -154,18 +230,7 @@ int main() {
         if (prevDeltaTimeForUpdateMs > 1000.0f/24)
         {
             prevTimeForUpdateArrays = currentTime;
-            for (int i = 0; i < sideSize; i++)
-            {
-                for (int j = 0; j < sideSize; j++)
-                {
-                    GLfloat x = globVertexBufferData[3 * (i * sideSize + j) + 0];
-                    GLfloat y = globVertexBufferData[3 * (i * sideSize + j) + 1];
-                    globVertexBufferData[3 * (i * sideSize + j) + 2] = 0.03f * std::cos(10.0f*x+10.1f*y+5.0f*(startDeltaTimeMs/1000));
-                }
-            }
-            glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(globVertexBufferData), globVertexBufferData);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            update(vboVertex, startDeltaTimeMs);
         }
 
         glm::mat4 view;
@@ -186,7 +251,7 @@ int main() {
 
         glBindVertexArray(vao);
         glEnableVertexAttribArray(0);
-        glDrawArrays(GL_POINTS, 0, sideSize * sideSize);
+        glDrawArrays(GL_TRIANGLES, 0, 18*(sideSize-1) * (sideSize-1));
 
         glDisableVertexAttribArray(0);
 

@@ -13,7 +13,7 @@ private:
     float radius;
 
 public:
-    Camera(GLFWwindow* window, const glm::vec3&startPosition, float startHorizontalAngleRad, float startVerticalAngleRad, float startRadius);
+    Camera(GLFWwindow* window, float startHorizontalAngleRad, float startVerticalAngleRad, float startRadius);
     void getViewMatrix(float deltaTimeMs, glm::mat4* pOutViewMatrix);
 
     Camera(Camera const &) = delete;
