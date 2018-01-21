@@ -3,8 +3,7 @@
 #include <algorithm>
 #include "camera.h"
 
-static const float speed = 4.0f; // units per second
-//static const float mouseSpeedRad = 0.0005f;
+static const float speed = 4.0f;
 
 Camera::Camera(GLFWwindow* window, float startHorizontalAngleRad, float startVerticalAngleRad, float startRadius):
     window(window),
@@ -25,30 +24,14 @@ void Camera::getViewMatrix(float deltaTimeMs, glm::mat4* pOutViewMatrix) {
     int windowWidth, windowHeight;
     glfwGetWindowSize(window, &windowWidth, &windowHeight);
 
-//    double mouseX, mouseY;
-//    glfwGetCursorPos(window, &mouseX, &mouseY);
-
-    //horizontalAngleRad += mouseSpeedRad * (windowWidth/2 - mouseX);
-    //verticalAngleRad += mouseSpeedRad * (windowHeight/2 - mouseY);
-
-//    glfwSetCursorPos(window, windowWidth/2, windowHeight/2);
-//
-//    glm::vec3 right = glm::vec3(
-//        sin(horizontalAngleRad - 3.14f/2.0f),
-//        0,
-//        cos(horizontalAngleRad - 3.14f/2.0f)
-//    );
-
-//    glm::vec3 up = glm::cross(right, direction);
-
     if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         verticalAngleRad += deltaTimeSec * speed;
-        verticalAngleRad = std::min(verticalAngleRad, 0.0f - 3.14f/6);
+        verticalAngleRad = std::min(verticalAngleRad, 0.0f - 3.14f/128);
     }
 
     if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
         verticalAngleRad -= deltaTimeSec * speed;
-        verticalAngleRad = std::max(verticalAngleRad, -3.14f + 3.14f/3);
+        verticalAngleRad = std::max(verticalAngleRad, -3.14f + 3.14f/12);
     }
 
     if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
@@ -61,13 +44,12 @@ void Camera::getViewMatrix(float deltaTimeMs, glm::mat4* pOutViewMatrix) {
 
     if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
         radius -= deltaTimeSec * speed;
-        radius = std::max(radius, 0.1f);
+        radius = std::max(radius, 0.01f);
     }
 
     if(glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
         radius += deltaTimeSec * speed;
     }
 
-    //*pOutViewMatrix = glm::lookAt(position, position + direction, up);
     *pOutViewMatrix = glm::lookAt(position, direction, glm::vec3(0,0,1));
 }

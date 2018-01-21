@@ -11,8 +11,11 @@
 #include "utils/camera.h"
 
 static const int sideSize = 100;
-static const int globVertexBufferDataSize = 2 * 3 * 3 * (sideSize-1) * (sideSize-1);
+static const int vertexAmount = 2 * 3 * (sideSize-1) * (sideSize-1);
+static const int globVertexBufferDataSize = 3 * vertexAmount;
+static const int globNormalBufferDataSize = 3 * vertexAmount;
 static GLfloat globVertexBufferData[globVertexBufferDataSize];
+static GLfloat globNormalBufferData[globNormalBufferDataSize];
 
 struct Wave
 {
@@ -21,12 +24,32 @@ struct Wave
     GLfloat vec_y;
     GLfloat freq;
     GLfloat phase;
+
+    Wave(GLfloat _ampl, GLfloat _vec_x, GLfloat _vec_y ,GLfloat _freq ,GLfloat _phase)
+    {
+        ampl = _ampl;
+        vec_x = _vec_x;
+        vec_y = _vec_y;
+        freq = _freq;
+        phase = _phase;
+    }
 };
 
 std::vector<Wave> waves;
 
 void windowSizeCallback(GLFWwindow *, int width, int height) {
     glViewport(0, 0, width, height);
+}
+
+GLfloat height(const std::vector<Wave> &waves, GLfloat x, GLfloat y, GLfloat time)
+{
+    GLfloat result = 0.0f;
+
+    for (int w = 0; w < waves.size(); w++) {
+        result += waves[w].ampl * std::cos(waves[w].vec_x * x + waves[w].vec_y * y + waves[w].freq * time + waves[w].phase);
+    }
+
+    return result;
 }
 
 void init()
@@ -49,63 +72,71 @@ void init()
             // на основании 4 вершин строится 2 треугольника. Добавляем их как 6 разных вершин
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 0] = x00;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 1] = y00;
-            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 2] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 2] = 0.0f;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 3] = x01;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 4] = y01;
-            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 5] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 5] = 0.0f;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 6] = x11;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 7] = y11;
-            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 8] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 8] = 0.0f;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 9] = x00;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 10] = y00;
-            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 11] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 11] = 0.0f;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 12] = x11;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 13] = y11;
-            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 14] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 14] = 0.0f;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 15] = x10;
             globVertexBufferData[18 * (i * (sideSize - 1) + j) + 16] = y10;
-            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 17] = 0;
+            globVertexBufferData[18 * (i * (sideSize - 1) + j) + 17] = 0.0f;
         }
     }
 
     // волны задаются в отдельном векторе
-    Wave wave1, wave2, wave3;
-    wave1.ampl = 0.05f;
-    wave1.vec_x = 10.0f;
-    wave1.vec_y = 10.0f;
-    wave1.freq = 5.0f;
-    wave1.phase = 0.0f;
-    waves.push_back(wave1);
-    wave2.ampl = 0.06f;
-    wave2.vec_x = 12.0f;
-    wave2.vec_y = 12.0f;
-    wave2.freq = 2.0f;
-    wave2.phase = 3.14f/2;
-    waves.push_back(wave2);
-    wave3.ampl = 0.03f;
-    wave3.vec_x = 0.0f;
-    wave3.vec_y = 3.0f;
-    wave3.freq = 2.0f;
-    wave3.phase = 0.75f;
-    waves.push_back(wave3);
+    waves.push_back(Wave(0.05f, 20.0f, 0.0f, 5.0f, 0.0f));
+    waves.push_back(Wave(0.03f, 0.0f, 10.0f, 8.0f, 1.0f));
+    //waves.push_back(Wave(0.0f, 20.0f, 0.0f, 5.0f, 0.0f));
+
+    for (int i = 0; i < globNormalBufferDataSize; i++)
+    {
+        globNormalBufferData[i] = 0.0f;
+    }
 }
 
-void update(GLuint &vboVertex, float &startDeltaTimeMs)
-{
-    for (int i = 0; i < globVertexBufferDataSize / 3; i++)
-    {
+void update(GLuint &vboVertex, GLuint &vboNormal, GLfloat &startDeltaTimeMs) {
+    // Меняем высоту водной поверхности в заданной точке. Считается как сумма волн.
+    GLfloat time = startDeltaTimeMs / 1000;
+
+    for (int i = 0; i < globVertexBufferDataSize / 3; i++) {
         GLfloat x = globVertexBufferData[3 * i + 0];
         GLfloat y = globVertexBufferData[3 * i + 1];
-        globVertexBufferData[3 * i + 2] = 0.0f;
-        for (int w = 0; w < waves.size(); w++)
-        {
-            globVertexBufferData[3 * i + 2] +=
-                    waves[w].ampl * std::cos(waves[w].vec_x * x + waves[w].vec_y * y +
-                    waves[w].freq * (startDeltaTimeMs / 1000) + waves[w].phase);
-        }
+        globVertexBufferData[3 * i + 2] = height(waves, x, y, time);
     }
     glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(globVertexBufferData), globVertexBufferData);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // После обновления массива координат вершин пересчитываем нормали.
+    for (int i = 0; i < globVertexBufferDataSize / 3; i++) {
+        GLfloat x = globVertexBufferData[3 * i + 0];
+        GLfloat y = globVertexBufferData[3 * i + 1];
+        GLfloat x_angle = 0.0f;
+        GLfloat y_angle = 0.0f;
+        for (int w = 0; w < waves.size(); w++) {
+            GLfloat diff = -waves[w].ampl * std::sin(waves[w].vec_x * x + waves[w].vec_y * y +
+                                                     waves[w].freq * time + waves[w].phase);
+            x_angle += waves[w].vec_x * diff;
+            y_angle += waves[w].vec_y * diff;
+        }
+        glm::vec3 x_tan_vec(1.0f, 0.0f, x_angle);
+        glm::vec3 y_tan_vec(0.0f, 1.0f, y_angle);
+        glm::vec3 cross_xy = glm::cross(x_tan_vec, y_tan_vec);
+
+        globNormalBufferData[3 * i + 0] = cross_xy.x;
+        globNormalBufferData[3 * i + 1] = cross_xy.y;
+        globNormalBufferData[3 * i + 2] = cross_xy.z;
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, vboNormal);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(globNormalBufferData), globNormalBufferData);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -150,6 +181,7 @@ int main() {
 
     glEnable(GL_DOUBLEBUFFER);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
 
     glClearColor(0, 0, 0, 1);
@@ -180,27 +212,53 @@ int main() {
 
     init();
 
-    GLuint vboVertex;
+    GLuint vboVertex, vboNormal;
     glGenBuffers(1, &vboVertex);
     glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
     glBufferData(GL_ARRAY_BUFFER, sizeof(globVertexBufferData), globVertexBufferData, GL_STREAM_DRAW);
 
+    glGenBuffers(1, &vboNormal);
+    glBindBuffer(GL_ARRAY_BUFFER, vboNormal);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(globVertexBufferData), globVertexBufferData, GL_STREAM_DRAW);
+
     GLuint vao;
     glGenVertexArrays(1, &vao);
-
     glBindVertexArray(vao);
+
     glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
-    glBindBuffer(GL_ARRAY_BUFFER, 0); // unbind VBO
-    glBindVertexArray(0); // unbind VAO
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vboNormal);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 
     glm::mat4 projection = glm::perspective(80.0f, (float)width / (float)height, 0.3f, 100.0f);
 
+    glm::vec3 sunDir(1.0f, 0.0f, 1.0f);
+    glm::vec3 sunColor(0.7f, 0.7f, 0.0f);
+    glm::vec3 ambColor(0.1f, 0.1f, 0.5f);
+
     GLint matrixId = glGetUniformLocation(programId, "MVP");
+    GLint sunDirId = glGetUniformLocation(programId, "sunDir");
+    GLint sunColorId = glGetUniformLocation(programId, "sunColor");
+    GLint ambColorId = glGetUniformLocation(programId, "ambColor");
+
+    std::cout << "matrixId = " << matrixId << std::endl;
+    std::cout << "sunDirId = " << sunDirId << std::endl;
+    std::cout << "sunColorId = " << sunColorId << std::endl;
+    std::cout << "ambColorId = " << ambColorId << std::endl;
+
+    glUseProgram(programId);
+    glUniform3f(sunDirId, sunDir.x, sunDir.y, sunDir.z);
+    glUniform3f(sunColorId, sunColor.x, sunColor.y, sunColor.z);
+    glUniform3f(ambColorId, ambColor.x, ambColor.y, ambColor.z);
+    glUseProgram(0);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    Camera camera(window, 0.0f, 0.0, 2.0f);
+    Camera camera(window, 0.0f, -0.5f, 2.0f);
 
     auto startTime = std::chrono::high_resolution_clock::now();
     auto prevTime = startTime;
@@ -230,16 +288,15 @@ int main() {
         if (prevDeltaTimeForUpdateMs > 1000.0f/24)
         {
             prevTimeForUpdateArrays = currentTime;
-            update(vboVertex, startDeltaTimeMs);
+            update(vboVertex, vboNormal, startDeltaTimeMs);
         }
 
         glm::mat4 view;
         camera.getViewMatrix(prevDeltaTimeMs, &view);
 
-        glm::mat4 model = glm::rotate(0.0f, 1.0f, 0.0f, 0.0f);
+        glm::mat4 model = glm::rotate(180.0f, 1.0f, 0.0f, 0.0f);
 
-        glm::mat4 mvp = projection * view * model; // matrix multiplication is the other way around
-        glUniformMatrix4fv(matrixId, 1, GL_FALSE, &mvp[0][0]);
+        glm::mat4 mvp = projection * view * model;
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -248,11 +305,13 @@ int main() {
         glViewport(0, 0, 2*width, 2*height);
 
         glUseProgram(programId); // Использование шейдеров
+        glUniformMatrix4fv(matrixId, 1, GL_FALSE, &mvp[0][0]);
 
         glBindVertexArray(vao);
         glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
         glDrawArrays(GL_TRIANGLES, 0, 18*(sideSize-1) * (sideSize-1));
-
+        glEnableVertexAttribArray(1);
         glDisableVertexAttribArray(0);
 
         glfwSwapBuffers(window);
@@ -261,6 +320,7 @@ int main() {
 
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vboVertex);
+    glDeleteBuffers(1, &vboNormal);
     glDeleteProgram(programId);
 
     glDeleteShader(vertexShaderId);

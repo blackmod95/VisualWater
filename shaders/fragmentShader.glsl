@@ -1,10 +1,13 @@
 #version 330 core
 
-in float warm;
+in float dirLight;
 
 out vec4 color;
 
+uniform vec3 sunColor;
+uniform vec3 ambColor;
+
 void main() {
-    vec3 rgb = mix(vec3(1,0.5,0), vec3(0,0.5,1), warm);
-    color = vec4(rgb,1);
+    vec3 rgb = clamp(sunColor * dirLight + ambColor, 0.0f, 1.0f);
+    color = vec4(rgb, 1.0f);
 }
