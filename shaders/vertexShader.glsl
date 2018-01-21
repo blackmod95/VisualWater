@@ -3,18 +3,18 @@
 layout(location = 0) in vec3 vertexPos;
 layout(location = 1) in vec3 vertexNormal;
 
-out float dirLight;
+out vec3 positionTmp;
+out vec3 normalTmp;
 
-uniform vec3 sunDir;
+//uniform vec3 sunDir;
 uniform mat4 MVP;
 
 void main() {
-    vec3 normal = normalize(vertexNormal);
-    vec3 normalSun = normalize(sunDir);
-    dirLight = max(0.0f, dot(normal, normalSun));
+    normalTmp = normalize(vertexNormal);
+    positionTmp = vertexPos;
 
     float warm = (1.0f - vertexPos.z) * 0.5f;
 
-    vec4 temp = vec4(vertexPos.xy, vertexPos.z * warm, 1.0f);
+    vec4 temp = vec4(vertexPos.xy, vertexPos.z * warm, warm);
     gl_Position = MVP * temp;
 }

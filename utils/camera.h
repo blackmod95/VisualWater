@@ -14,6 +14,7 @@ private:
 
 public:
     Camera(GLFWwindow* window, float startHorizontalAngleRad, float startVerticalAngleRad, float startRadius);
+    glm::vec3 getPosition();
     void getViewMatrix(float deltaTimeMs, glm::mat4* pOutViewMatrix);
 
     Camera(Camera const &) = delete;

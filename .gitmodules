@@ -7,3 +7,6 @@
 [submodule "glxw"]
 	path = glxw
 	url = http://glxw.dav1d.de/glxw.git
+[submodule "stb"]
+	path = stb
+	url = https://github.com/nothings/stb.git

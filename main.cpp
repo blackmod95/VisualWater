@@ -10,12 +10,17 @@
 #include "utils/utils.h"
 #include "utils/camera.h"
 
+#define STBI_NO_GIF 1
+#define STB_IMAGE_IMPLEMENTATION 1
+#include "stb/stb_image.h"
+
 static const int sideSize = 100;
 static const int vertexAmount = 2 * 3 * (sideSize-1) * (sideSize-1);
 static const int globVertexBufferDataSize = 3 * vertexAmount;
 static const int globNormalBufferDataSize = 3 * vertexAmount;
 static GLfloat globVertexBufferData[globVertexBufferDataSize];
 static GLfloat globNormalBufferData[globNormalBufferDataSize];
+
 
 struct Wave
 {
@@ -236,16 +241,20 @@ int main() {
 
     glm::mat4 projection = glm::perspective(80.0f, (float)width / (float)height, 0.3f, 100.0f);
 
-    glm::vec3 sunDir(1.0f, 0.0f, 1.0f);
+    glm::vec3 sunDir(1.0f, 0.0f, 50.0f);
     glm::vec3 sunColor(0.7f, 0.7f, 0.0f);
     glm::vec3 ambColor(0.1f, 0.1f, 0.5f);
 
     GLint matrixId = glGetUniformLocation(programId, "MVP");
+    GLint eyeId = glGetUniformLocation(programId, "eye");
+    GLint samplerId = glGetUniformLocation(programId, "textureSampler");
     GLint sunDirId = glGetUniformLocation(programId, "sunDir");
     GLint sunColorId = glGetUniformLocation(programId, "sunColor");
     GLint ambColorId = glGetUniformLocation(programId, "ambColor");
 
     std::cout << "matrixId = " << matrixId << std::endl;
+    std::cout << "eyeId = " << eyeId << std::endl;
+    std::cout << "textureSampler = " << samplerId << std::endl;
     std::cout << "sunDirId = " << sunDirId << std::endl;
     std::cout << "sunColorId = " << sunColorId << std::endl;
     std::cout << "ambColorId = " << ambColorId << std::endl;
@@ -254,6 +263,20 @@ int main() {
     glUniform3f(sunDirId, sunDir.x, sunDir.y, sunDir.z);
     glUniform3f(sunColorId, sunColor.x, sunColor.y, sunColor.z);
     glUniform3f(ambColorId, ambColor.x, ambColor.y, ambColor.z);
+    glUniform1i(samplerId, 0);
+    glUseProgram(0);
+
+    // Текстуры
+
+    GLuint textureArray[2];
+    int texturesNum = sizeof(textureArray)/sizeof(textureArray[0]);
+    glGenTextures(texturesNum, textureArray);
+
+    if (!loadCommonTexture("textures/sky_texture.jpg", textureArray[0]))
+        return -1;
+
+    glUseProgram(programId);
+    glBindTexture(GL_TEXTURE_2D, textureArray[0]);
     glUseProgram(0);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -265,6 +288,7 @@ int main() {
 
     auto prevTimeForUpdateArrays = startTime;
 
+    // Основной цикл. Не завершится, пока не нажмешь на Q.
     while(glfwWindowShouldClose(window) == GL_FALSE) {
         // выход из программы
         if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) break;
@@ -304,8 +328,11 @@ int main() {
         glfwGetWindowSize(window, &width, &height);
         glViewport(0, 0, 2*width, 2*height);
 
+        glm::vec3 eye = camera.getPosition();
+
         glUseProgram(programId); // Использование шейдеров
         glUniformMatrix4fv(matrixId, 1, GL_FALSE, &mvp[0][0]);
+        glUniform3f(eyeId, eye.x, eye.y, eye.z);
 
         glBindVertexArray(vao);
         glEnableVertexAttribArray(0);
@@ -316,6 +343,8 @@ int main() {
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        glUseProgram(0);
     }
 
     glDeleteVertexArrays(1, &vao);
