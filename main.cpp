@@ -98,7 +98,7 @@ void init()
 
     // волны задаются в отдельном векторе
     waves.push_back(Wave(0.05f, 20.0f, 0.0f, 5.0f, 0.0f));
-    waves.push_back(Wave(0.03f, 0.0f, 10.0f, 8.0f, 1.0f));
+    waves.push_back(Wave(0.07f, 0.0f, 5.0f, 8.0f, 1.0f));
     //waves.push_back(Wave(0.0f, 20.0f, 0.0f, 5.0f, 0.0f));
 
     for (int i = 0; i < globNormalBufferDataSize; i++)
@@ -241,29 +241,36 @@ int main() {
 
     glm::mat4 projection = glm::perspective(80.0f, (float)width / (float)height, 0.3f, 100.0f);
 
-    glm::vec3 sunDir(1.0f, 0.0f, 50.0f);
-    glm::vec3 sunColor(0.7f, 0.7f, 0.0f);
-    glm::vec3 ambColor(0.1f, 0.1f, 0.5f);
+    glm::vec3 sunDir(1.1f, 0.0f, 0.1f);
+    glm::vec3 sunDiffuseColor(1.0f, 0.8f, 1.0f);
+    glm::vec3 sunReflColor(1.0f, 0.8f, 0.6f);
 
     GLint matrixId = glGetUniformLocation(programId, "MVP");
     GLint eyeId = glGetUniformLocation(programId, "eye");
-    GLint samplerId = glGetUniformLocation(programId, "textureSampler");
+    GLint skySamplerId = glGetUniformLocation(programId, "skySampler");
+    GLint sandSamplerId = glGetUniformLocation(programId, "sandSampler");
     GLint sunDirId = glGetUniformLocation(programId, "sunDir");
-    GLint sunColorId = glGetUniformLocation(programId, "sunColor");
-    GLint ambColorId = glGetUniformLocation(programId, "ambColor");
+    GLint sunDiffuseColorId = glGetUniformLocation(programId, "sunDiffuseColor");
+    GLint sunReflColorId = glGetUniformLocation(programId, "sunReflColor");
+    GLint coefRefrId = glGetUniformLocation(programId, "coefRefr");
+    GLint sandDepthId = glGetUniformLocation(programId, "sandDepth");
 
     std::cout << "matrixId = " << matrixId << std::endl;
     std::cout << "eyeId = " << eyeId << std::endl;
-    std::cout << "textureSampler = " << samplerId << std::endl;
+    std::cout << "skySamplerId = " << skySamplerId << std::endl;
+    std::cout << "sandSamplerId = " << sandSamplerId << std::endl;
     std::cout << "sunDirId = " << sunDirId << std::endl;
-    std::cout << "sunColorId = " << sunColorId << std::endl;
-    std::cout << "ambColorId = " << ambColorId << std::endl;
+    std::cout << "sunDiffuseColorId = " << sunDiffuseColorId << std::endl;
+    std::cout << "sunReflColorId = " << sunReflColorId << std::endl;
+    std::cout << "coefRefrId = " << coefRefrId << std::endl;
+    std::cout << "sandDepthId = " << sandDepthId << std::endl;
 
     glUseProgram(programId);
     glUniform3f(sunDirId, sunDir.x, sunDir.y, sunDir.z);
-    glUniform3f(sunColorId, sunColor.x, sunColor.y, sunColor.z);
-    glUniform3f(ambColorId, ambColor.x, ambColor.y, ambColor.z);
-    glUniform1i(samplerId, 0);
+    glUniform3f(sunDiffuseColorId, sunDiffuseColor.x, sunDiffuseColor.y, sunDiffuseColor.z);
+    glUniform3f(sunReflColorId, sunReflColor.x, sunReflColor.y, sunReflColor.z);
+    glUniform1f(coefRefrId, 0.9f);
+    glUniform1f(sandDepthId, 1.0f);
     glUseProgram(0);
 
     // Текстуры
@@ -274,9 +281,16 @@ int main() {
 
     if (!loadCommonTexture("textures/sky_texture.jpg", textureArray[0]))
         return -1;
+    if (!loadCommonTexture("textures/sand_texture.jpg", textureArray[1]))
+        return -1;
 
     glUseProgram(programId);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureArray[0]);
+    glUniform1i(skySamplerId, 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, textureArray[1]);
+    glUniform1i(sandSamplerId, 1);
     glUseProgram(0);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
